@@ -292,6 +292,9 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 				if not GroupLib.InRaid() then 
 					if not GroupLib.AmILeader() then
 						announce = false
+					else
+						self:log(L["invited"])					
+						GroupLib.Invite(tMessage.strSender)
 					end
 				else
 					if not GroupLib.AmILeader() then
@@ -367,6 +370,10 @@ function AfRaidAnnouncer:OnOK()
 	end
 
 	self.active = self.wndMain:FindChild("active"):IsChecked()
+	
+	if self.active and self.counter == 0 then
+		self.counter = 2
+	end
 	self.werbung  = self.wndMain:FindChild("werbung"):GetText()
 	self.werbungtime = self.wndMain:FindChild("werbungtime"):IsChecked()
 	self.werbungreply = self.wndMain:FindChild("werbungreply"):IsChecked()

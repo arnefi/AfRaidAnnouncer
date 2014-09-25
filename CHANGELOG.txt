@@ -1,0 +1,6 @@
+=== v1.0 ===
+* minor fixes, ready to leave beta
+
+=== v0.1-beta ===
+* first beta version
+* main features working
