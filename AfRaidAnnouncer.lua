@@ -32,6 +32,7 @@ function AfRaidAnnouncer:new(o)
 	self.werbungreplaced = ""
 	self.werbungtime = false
 	self.werbungreply = true
+	self.history = {}
 
     return o
 end
@@ -100,9 +101,7 @@ function AfRaidAnnouncer:OnInterfaceMenuListHasLoaded()
 end
 
 
--- on SlashCommand "/afraid"
-function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
-	self.wndMain:Invoke() -- show the window
+function AfRaidAnnouncer:refreshWords()
 	local words = ""
 	for _,wort in pairs(self.words) do
 		words = words .. wort .. ", "
@@ -118,8 +117,28 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	else
 		self.wndMain:FindChild("werbung"):SetText(self.werbung)
 	end
+end
+
+
+-- on SlashCommand "/afraid"
+function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
+	self.wndMain:Invoke() -- show the window
+	self:refreshWords()
 	self.wndMain:FindChild("werbungtime"):SetCheck(self.werbungtime)
 	self.wndMain:FindChild("werbungreply"):SetCheck(self.werbungreply)
+	
+	-- History
+	local container = self.wndMain:FindChild("container")
+	
+	container:DestroyChildren()
+
+	for idxHistory, entry in pairs(self.history) do
+		local wndCurr = Apollo.LoadForm(self.xmlDoc, "HistoryItem", container, self)
+		wndCurr:SetData(idxHistory)
+		wndCurr:FindChild("Button"):SetText(entry["words"][1])
+	end
+	container:ArrangeChildrenVert()
+
 	
 	self.wndMain:FindChild("version"):SetText(strVersion)
 	
@@ -188,6 +207,7 @@ function AfRaidAnnouncer:OnSave(eType)
 	tSavedData.werbung = self.werbung
 	tSavedData.werbungtime = self.werbungtime
 	tSavedData.werbungreply = self.werbungreply
+	tSavedData.history = self.history
 	return tSavedData
 end
 
@@ -200,6 +220,7 @@ function AfRaidAnnouncer:OnRestore(eType, tSavedData)
 	self.werbung = tSavedData.werbung
 	self.werbungtime = tSavedData.werbungtime
 	self.werbungreply = tSavedData.werbungreply
+	self.history = tSavedData.history
 end
 
 
@@ -343,12 +364,43 @@ function AfRaidAnnouncer:OnOK()
 	local drPlayer = GameLib.GetPlayerUnit()
 	local strName = drPlayer and drPlayer:GetName() or "me"
 	self.werbungreplaced = string.gsub(self.werbung, "%[me%]", strName)
+	
+	local entry = {["werbung"] = self.werbung, ["words"] = self.words}
+	
+	local found = false
+	for idx, hentry in pairs(self.history) do
+		if hentry["words"][1] == self.words[1] then
+			self.history[idx] = entry
+			found = true
+		end
+	end
+	if not found then
+		table.insert(self.history, entry)
+	end
+	
 	self.wndMain:Close() -- hide the window
 end
 
 -- when the Cancel button is clicked
 function AfRaidAnnouncer:OnCancel()
 	self.wndMain:Close() -- hide the window
+end
+
+
+function AfRaidAnnouncer:OnDeleteHistoryItem(wndHandler, wndControl)
+	local idx = wndHandler:GetParent():GetData()
+	table.remove(self.history, idx)
+	wndHandler:GetParent():Destroy()
+	local container = self.wndMain:FindChild("container")
+	container:ArrangeChildrenVert()
+end
+
+
+function AfRaidAnnouncer:OnHistoryItem(wndHandler, wndControl)
+	local idx = wndHandler:GetParent():GetData()
+	self.words = self.history[idx]["words"]
+	self.werbung = self.history[idx]["werbung"]
+	self:refreshWords()
 end
 
 
