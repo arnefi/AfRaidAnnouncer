@@ -1,6 +1,6 @@
 # AfRaidAnnouncer
 
-WildStar-Addon
+[WildStar](http://www.wildstar-online.com)-Addon
 
 ## Description
 
@@ -8,7 +8,7 @@ Ever tried to manage a raid for an open world event? Every 2 minutes there's som
 
 This addon lets you define a slogan like »For R-12 /join me« which can be posted regularly on the zone chat.
 
-It also lets you define some words, which it reacts to (e.g. "r12, r-12, +"). If anyone posts one of these words in the zone chat he will be invited automatically to the raid. And for all the other latecomers the slogan can be posted again.
+It also lets you define some words, which it reacts on (e.g. "r12, r-12, +"). If anyone posts one of these words in the zone chat he will be invited automatically to the raid. And for all the other latecomers the slogan can be posted again.
 
 Building a raid is fun again! :-)
 

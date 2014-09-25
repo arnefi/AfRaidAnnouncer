@@ -141,7 +141,7 @@ function AfRaidAnnouncer:OnTimer()
 		if self.counter == 0 then
 			if self.active and self.werbungtime and self.werbungreplaced ~= "" then
 				for _,channel in pairs(ChatSystemLib.GetChannels()) do
-		        	if channel:GetType() == ChatSystemLib.ChatChannel_Say then
+		        	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
 				        channel:Send(self.werbungreplaced)
 						self.counter = 300
 		    	    end
@@ -282,7 +282,7 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 	
 			if announce and self.werbungreplaced ~= "" then		
 		        for _,channel in pairs(ChatSystemLib.GetChannels()) do
-		        	if channel:GetType() == ChatSystemLib.ChatChannel_Say then
+		        	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
 				        channel:Send(self.werbungreplaced)
 						self.counter = 300
 		    	    end
