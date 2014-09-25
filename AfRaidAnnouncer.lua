@@ -258,7 +258,8 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 		for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
 			sMessage = string.lower(tSegment.strText)
 			for _,reiz in pairs(self.words) do
-				if string.find(sMessage, reiz) then 
+				reiz = reiz:lower()
+				if string.find(sMessage, reiz, 1, true) then 
 					bFound = true
 				end			
 			end
@@ -269,7 +270,7 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 		
 			local announce = true
 			local message = L["usedTerm"]
-			string.gsub(message,"%[USER%]",tMessage.strSender)
+			message = string.gsub(message,"%[USER%]",tMessage.strSender)
 			self:log(message)
 			
 			if not self.werbungreply then announce = false end
