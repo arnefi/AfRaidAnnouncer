@@ -56,7 +56,6 @@ function AfRaidAnnouncer:OnLoad()
 	self.xmlDoc = XmlDoc.CreateFromFile("AfRaidAnnouncer.xml")
 	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
 	Apollo.LoadSprites("AfRaidAnnouncerSprites.xml", "AfRaidAnnounserSprites")
-	
 end
 
 -----------------------------------------------------------------------------------------------
@@ -159,11 +158,13 @@ function AfRaidAnnouncer:OnTimer()
 		self.counter = self.counter - 1
 		if self.counter == 0 then
 			if self.active and self.werbungtime and self.werbungreplaced ~= "" then
-				for _,channel in pairs(ChatSystemLib.GetChannels()) do
-		        	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
-				        channel:Send(self.werbungreplaced)
-						self.counter = 300
-		    	    end
+				if GroupLib.GetMemberCount() < 40 then
+					for _,channel in pairs(ChatSystemLib.GetChannels()) do
+			        	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
+					        channel:Send(self.werbungreplaced)
+							self.counter = 300
+			    	    end
+					end
 				end
 			end
 		end
@@ -296,8 +297,13 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 					if not GroupLib.AmILeader() then
 						announce = false
 					else
-						self:log(L["invited"])
-						GroupLib.Invite(tMessage.strSender)
+						if GroupLib.GetMemberCount() < 40 then
+							self:log(L["invited"])
+							GroupLib.Invite(tMessage.strSender)
+						else
+							self:log(L["full"])
+							announce = false
+						end
 					end
 				end
 			end
@@ -317,14 +323,16 @@ end
 
 function AfRaidAnnouncer:ChangeSettings()
 	if GroupLib.InGroup() then
+		if GroupLib.AmILeader() then
+			GroupLib.SetJoinRequestMethod(GroupLib.InvitationMethod.Open)
+			GroupLib.SetReferralMethod(GroupLib.InvitationMethod.Open)
+		end
 		if not GroupLib.InRaid() then 
 			if not GroupLib.AmILeader() then
 				self:log(L["noGroupRights"])
 				self.active = false
 			else
 				self:log(L["converting"])
-				GroupLib.SetJoinRequestMethod(GroupLib.InvitationMethod.Open)
-				GroupLib.SetReferralMethod(GroupLib.InvitationMethod.Open)
 				GroupLib.ConvertToRaid()
 			end
 		else
