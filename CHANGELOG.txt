@@ -1,6 +1,9 @@
-=== v1.0 ===
+## v1.1 -- unreleased
+* check whether you're the leader when activating
+
+# v1.0
 * minor fixes, ready to leave beta
 
-=== v0.1-beta ===
+### v0.1-beta
 * first beta version
 * main features working

@@ -14,3 +14,4 @@ L["noGroupRights"] = "You are in a group instead of a raid and you don't have an
 L["converting"] = "Converting group to raid."
 L["noLead"] = "You are not the leader of this raid."
 L["full"] = "Raid full."
+L["YouNoLeader"] = "You're not the leader. Only he should use this addon."

@@ -359,6 +359,16 @@ end
 -----------------------------------------------------------------------------------------------
 -- when the OK button is clicked
 function AfRaidAnnouncer:OnOK()
+
+	-- user wants to activate it, sanity check
+	if self.wndMain:FindChild("active"):IsChecked() then
+		if GroupLib.InGroup() and not GroupLib.AmILeader() then
+			self.wndMain:FindChild("active"):SetCheck(false);
+			self.log = L["YouNoLeader"]
+			return
+		end
+	end
+
 	local words = self.wndMain:FindChild("ReizWort"):GetText()
 	self.words = {}
 	for wort in string.gmatch(words, '([^,]+)') do
