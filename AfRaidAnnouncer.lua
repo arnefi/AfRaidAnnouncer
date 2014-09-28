@@ -178,6 +178,9 @@ function AfRaidAnnouncer:OnGroupJoinRequest(strInviterName)
 	-- if (not in group) or (ingroup and leader)
 	if self.active and ((not GroupLib.InGroup() and not GroupLib.InRaid()) or (GroupLib.AmILeader() and (GroupLib.InGroup() or GroupLib.InRaid()))) then
 		GroupLib.AcceptRequest()
+		if Apollo.FindWindowByName("GroupRequestDialog") ~= nil then
+			Apollo.FindWindowByName("GroupRequestDialog"):Show(false)
+		end
 		self:ChangeSettings()
 	end
 end
@@ -188,6 +191,9 @@ function AfRaidAnnouncer:OnGroupReferral(nMemberIndex, strTarget)
 	-- shouldn't be necessary if settings are correct
 	if self.active and (GroupLib.AmILeader() and (GroupLib.InGroup() or GroupLib.InRaid())) then
 		GroupLib.AcceptRequest()
+		if Apollo.FindWindowByName("GroupRequestDialog") ~= nil then
+			Apollo.FindWindowByName("GroupRequestDialog"):Show(false)
+		end
 		self:ChangeSettings()
 	end
 end
