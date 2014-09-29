@@ -1,6 +1,7 @@
-## v1.1 -- unreleased
+## v1.1
 * check whether you're the leader when activating
 * suppressing confirmation window
+* can kick player that are offline for more than five minutes
 
 # v1.0
 * minor fixes, ready to leave beta

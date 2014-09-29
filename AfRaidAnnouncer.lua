@@ -26,13 +26,17 @@ function AfRaidAnnouncer:new(o)
 
     -- initialize variables here
 	self.counter = 0
+	self.sanitizeCounter = 0
 	self.words = {}
 	self.active = false
 	self.werbung = ""
+	self.sanitize = false
 	self.werbungreplaced = ""
 	self.werbungtime = false
 	self.werbungreply = true
 	self.history = {}
+	self.beenInGroup = false
+	self.offline = {}
 
     return o
 end
@@ -84,6 +88,7 @@ function AfRaidAnnouncer:OnDocLoaded()
 		Apollo.RegisterEventHandler("Group_JoinRequest", "OnGroupJoinRequest", self)			-- ( name )	
 		Apollo.RegisterEventHandler("Group_Referral", "OnGroupReferral", self)			-- ( nMemberIndex, name )
 		Apollo.RegisterEventHandler("Group_Add", "OnGroupAdd", self)					-- ( name )
+		Apollo.RegisterEventHandler("Group_Left", "OnGroup_Left", self)
 		self.timer = ApolloTimer.Create(1.0, true, "OnTimer", self)
 
 		-- Do additional Addon initialization here
@@ -125,6 +130,7 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self:refreshWords()
 	self.wndMain:FindChild("werbungtime"):SetCheck(self.werbungtime)
 	self.wndMain:FindChild("werbungreply"):SetCheck(self.werbungreply)
+	self.wndMain:FindChild("chkSanitize"):SetCheck(self.sanitize)
 	
 	-- History
 	local container = self.wndMain:FindChild("container")
@@ -148,6 +154,8 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self.wndMain:FindChild("werbungtime"):SetText(L["lblWerbungtime"])
 	self.wndMain:FindChild("werbungreply"):SetText(L["lblWerbungreply"])
 	self.wndMain:FindChild("CancelButton"):SetText(L["lblCancel"])
+	self.wndMain:FindChild("chkSanitize"):SetText(L["lblSanitize"])
+	self.wndMain:FindChild("chkSanitize"):SetTooltip(L["ttSanitize"])
 end
 
 -- on timer
@@ -169,6 +177,17 @@ function AfRaidAnnouncer:OnTimer()
 			end
 		end
 	end
+	if self.active then
+		if self.sanitizeCounter > 0 then
+			self.sanitizeCounter = self.sanitizeCounter - 1
+			if self.sanitizeCounter == 0 then
+				self:SanitizeRaid()
+				self.sanitizeCounter = 10
+			end
+		else
+			self.sanitizeCounter = 10
+		end
+	end
 end
 
 
@@ -177,6 +196,7 @@ function AfRaidAnnouncer:OnGroupJoinRequest(strInviterName)
 	-- (shouldn't be neccessary if settings are correct, except for the first one!
 	-- if (not in group) or (ingroup and leader)
 	if self.active and ((not GroupLib.InGroup() and not GroupLib.InRaid()) or (GroupLib.AmILeader() and (GroupLib.InGroup() or GroupLib.InRaid()))) then
+		self.beenInGroup = true
 		GroupLib.AcceptRequest()
 		if Apollo.FindWindowByName("GroupRequestDialog") ~= nil then
 			Apollo.FindWindowByName("GroupRequestDialog"):Show(false)
@@ -190,6 +210,7 @@ function AfRaidAnnouncer:OnGroupReferral(nMemberIndex, strTarget)
 	-- nMemberIndex invites strTarget to join our group: auto-accept
 	-- shouldn't be necessary if settings are correct
 	if self.active and (GroupLib.AmILeader() and (GroupLib.InGroup() or GroupLib.InRaid())) then
+		self.beenInGroup = true
 		GroupLib.AcceptRequest()
 		if Apollo.FindWindowByName("GroupRequestDialog") ~= nil then
 			Apollo.FindWindowByName("GroupRequestDialog"):Show(false)
@@ -215,6 +236,7 @@ function AfRaidAnnouncer:OnSave(eType)
 	tSavedData.werbungtime = self.werbungtime
 	tSavedData.werbungreply = self.werbungreply
 	tSavedData.history = self.history
+	tSavedData.sanitize = self.sanitize
 	return tSavedData
 end
 
@@ -228,6 +250,7 @@ function AfRaidAnnouncer:OnRestore(eType, tSavedData)
 	self.werbungtime = tSavedData.werbungtime
 	self.werbungreply = tSavedData.werbungreply
 	self.history = tSavedData.history
+	self.sanitize = tSavedData.sanitize
 end
 
 
@@ -332,6 +355,7 @@ end
 
 function AfRaidAnnouncer:ChangeSettings()
 	if GroupLib.InGroup() then
+		self.beenInGroup = true
 		if GroupLib.AmILeader() then
 			GroupLib.SetJoinRequestMethod(GroupLib.InvitationMethod.Open)
 			GroupLib.SetReferralMethod(GroupLib.InvitationMethod.Open)
@@ -350,6 +374,48 @@ function AfRaidAnnouncer:ChangeSettings()
 				self.active = false
 			end
 		end
+	end
+end
+
+
+function AfRaidAnnouncer:OnGroupLeft(eReason)
+	local unitMe = GameLib.GetPlayerUnit()
+	if unitMe == nil then
+		return
+    end
+	self:log(L["left"])
+	self.active = false
+end
+
+
+-- kick players offline for over 5 minutes
+function AfRaidAnnouncer:SanitizeRaid()
+	local nMembers = GroupLib.GetMemberCount()
+	local nCount = 0
+	local nNow = os.time()
+	if nMembers > 0 then
+		for idx = nMembers, 1, -1 do
+			local tMemberInfo = GroupLib.GetGroupMember(idx)
+			if tMemberInfo ~= nil then
+				local sCharname = tMemberInfo.strCharacterName
+				if tMemberInfo.bIsOnline then
+					self.offline[sCharname] = nil
+				else
+					if self.offline[sCharname] == nil then
+						self.offline[sCharname] = os.time()
+					else
+						if self.sanitize then
+							if nNow > (self.offline[sCharname] + 300) then
+								local message = L["offline"]
+								message = string.gsub(message,"%[USER%]",sCharname)
+								self:log(message)
+								GroupLib.Kick(idx, "")
+							end
+						end
+					end
+				end
+			end
+		end	
 	end
 end
 
@@ -374,6 +440,8 @@ function AfRaidAnnouncer:OnOK()
 			return
 		end
 	end
+	
+	for k,v in pairs(self.offline) do self.offline[k] = nil end
 
 	local words = self.wndMain:FindChild("ReizWort"):GetText()
 	self.words = {}
@@ -381,11 +449,14 @@ function AfRaidAnnouncer:OnOK()
 		wort = wort:gsub("^%s*(.-)%s*$", "%1")
 		table.insert(self.words, wort)
 	end
+	
 	if not self.active and self.wndMain:FindChild("active"):IsChecked() then
+		self.beenInGroup = false
 		self.counter = 2
 	end
 
 	self.active = self.wndMain:FindChild("active"):IsChecked()
+	self.sanitize = self.wndMain:FindChild("chkSanitize"):IsChecked()
 	
 	if self.active and self.counter == 0 then
 		self.counter = 2
@@ -412,6 +483,7 @@ function AfRaidAnnouncer:OnOK()
 	
 	self.wndMain:Close() -- hide the window
 end
+
 
 -- when the Cancel button is clicked
 function AfRaidAnnouncer:OnCancel()
