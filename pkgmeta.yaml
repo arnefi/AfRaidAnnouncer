@@ -1,6 +1,2 @@
 ignore:
     - README.md
-
-manual-changelog:
-    filename: CHANGELOG.txt
-    markup-type: markdown

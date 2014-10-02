@@ -444,8 +444,10 @@ function AfRaidAnnouncer:OnGroupLeft(eReason)
 	if unitMe == nil then
 		return
     end
-	self:log(L["left"])
-	self.active = false
+	if self.active then
+		self:log(L["left"])
+		self.active = false
+	end
 end
 
 
