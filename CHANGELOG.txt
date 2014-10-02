@@ -1,3 +1,6 @@
+### v1.2.1
+* disable converting group to raid if not active
+
 ## v1.2
 * suppressing confirmation window (now really)
 * if someone "joins" your group while you're alone he will be the group leader, that's why we only post our slogan if we are in a group already
