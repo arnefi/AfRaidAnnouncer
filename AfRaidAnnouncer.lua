@@ -410,7 +410,7 @@ end
 -----------------------------------------------------------------------------------------------
 
 function AfRaidAnnouncer:ChangeSettings()
-	if not self.active return end
+	if not self.active then return end
 	if GroupLib.InGroup() then
 		self.beenInGroup = true
 		if GroupLib.AmILeader() then
