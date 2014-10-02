@@ -1,5 +1,5 @@
 ignore:
-    - CHANGELOG.txt
+    - README.md
 
 manual-changelog:
     filename: CHANGELOG.txt

@@ -8,7 +8,8 @@ require "Window"
 -----------------------------------------------------------------------------------------------
 -- AfRaidAnnouncer Module Definition
 -----------------------------------------------------------------------------------------------
-local AfRaidAnnouncer = {} 
+-- local AfRaidAnnouncer = {} 
+AfRaidAnnouncer = Apollo.GetPackage("Gemini:Addon-1.0").tPackage:NewAddon("AfRaidAnnouncer", false, {}, "Gemini:Hook-1.0")
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:GetLocale("AfRaidAnnouncer", true)
  
 -----------------------------------------------------------------------------------------------
@@ -37,7 +38,6 @@ function AfRaidAnnouncer:new(o)
 	self.history = {}
 	self.beenInGroup = false
 	self.offline = {}
-
     return o
 end
 
@@ -85,12 +85,15 @@ function AfRaidAnnouncer:OnDocLoaded()
 		Apollo.RegisterEventHandler("AfRaidAnnouncerOn", "OnAfRaidAnnouncerOn", self)
 		Apollo.RegisterEventHandler("ChatMessage", "OnChatMessage", self)
 		Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
-		Apollo.RegisterEventHandler("Group_JoinRequest", "OnGroupJoinRequest", self)			-- ( name )	
-		Apollo.RegisterEventHandler("Group_Referral", "OnGroupReferral", self)			-- ( nMemberIndex, name )
-		Apollo.RegisterEventHandler("Group_Add", "OnGroupAdd", self)					-- ( name )
-		Apollo.RegisterEventHandler("Group_Left", "OnGroup_Left", self)
+		--Apollo.RegisterEventHandler("Group_JoinRequest", "OnGroupJoinRequest", self)
+		--Apollo.RegisterEventHandler("Group_Referral", "OnGroupReferral", self)
+		Apollo.RegisterEventHandler("Group_Add", "OnGroupAdd", self)
+		Apollo.RegisterEventHandler("Group_Left", "OnGroupLeft", self)
 		self.timer = ApolloTimer.Create(1.0, true, "OnTimer", self)
 
+		self:RawHook(Apollo.GetAddon("GroupFrame"), "OnGroupJoinRequest")
+		self:RawHook(Apollo.GetAddon("GroupFrame"), "OnGroupReferral")
+	
 		-- Do additional Addon initialization here
 	end
 end
@@ -100,10 +103,19 @@ end
 -----------------------------------------------------------------------------------------------
 -- Define general functions here
 
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer OnInterfaceMenuListHasLoaded: create start menu entry
+-----------------------------------------------------------------------------------------------
+
 function AfRaidAnnouncer:OnInterfaceMenuListHasLoaded()
 	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", "afRaidAnnouncer", {"AfRaidAnnouncerOn", "", "AfRaidAnnouncerSprites:MenuIcon"})
 end
 
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer refreshWords: fill GUI field with comma separated list of our words table
+-----------------------------------------------------------------------------------------------
 
 function AfRaidAnnouncer:refreshWords()
 	local words = ""
@@ -124,9 +136,13 @@ function AfRaidAnnouncer:refreshWords()
 end
 
 
--- on SlashCommand "/afraid"
+-----------------------------------------------------------------------------------------------
+-- AfRaidAddouncer OnAfRaidAnnouncerOn: Slash command, refresh and show dialog
+-----------------------------------------------------------------------------------------------
+
 function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self.wndMain:Invoke() -- show the window
+	
 	self:refreshWords()
 	self.wndMain:FindChild("werbungtime"):SetCheck(self.werbungtime)
 	self.wndMain:FindChild("werbungreply"):SetCheck(self.werbungreply)
@@ -156,9 +172,15 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self.wndMain:FindChild("CancelButton"):SetText(L["lblCancel"])
 	self.wndMain:FindChild("chkSanitize"):SetText(L["lblSanitize"])
 	self.wndMain:FindChild("chkSanitize"):SetTooltip(L["ttSanitize"])
+	self.wndMain:FindChild("werbungtime"):SetTooltip(L["onlyGroup"])
+	self.wndMain:FindChild("werbungreply"):SetTooltip(L["onlyGroup"])
 end
 
--- on timer
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer OnTimer: timer for posting to chat, kicking offline players
+-----------------------------------------------------------------------------------------------
+
 function AfRaidAnnouncer:OnTimer()
 	-- count counter down to zero
 	-- to avoid spamming wait at least 5 minutes
@@ -167,16 +189,24 @@ function AfRaidAnnouncer:OnTimer()
 		if self.counter == 0 then
 			if self.active and self.werbungtime and self.werbungreplaced ~= "" then
 				if GroupLib.GetMemberCount() < 40 then
-					for _,channel in pairs(ChatSystemLib.GetChannels()) do
-			        	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
-					        channel:Send(self.werbungreplaced)
-							self.counter = 300
-			    	    end
+					if GroupLib.InGroup() then
+						for _,channel in pairs(ChatSystemLib.GetChannels()) do
+				        	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
+						        channel:Send(self.werbungreplaced)
+								self.counter = 300
+				    	    end
+						end
+					else
+						-- don't post if not in group already
+						-- otherwise the joining player will be lead
+						self.counter = 30
 					end
 				end
 			end
 		end
 	end
+
+	-- check for offline players every 10 seconds
 	if self.active then
 		if self.sanitizeCounter > 0 then
 			self.sanitizeCounter = self.sanitizeCounter - 1
@@ -191,40 +221,54 @@ function AfRaidAnnouncer:OnTimer()
 end
 
 
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer OnGroupJoinRequest: someone wants to join our group. 
+--       Hide confirmation window
+-----------------------------------------------------------------------------------------------
+
 function AfRaidAnnouncer:OnGroupJoinRequest(strInviterName)
 	-- someone asks to join our group: auto-accept
-	-- (shouldn't be neccessary if settings are correct, except for the first one!
-	-- if (not in group) or (ingroup and leader)
-	if self.active and ((not GroupLib.InGroup() and not GroupLib.InRaid()) or (GroupLib.AmILeader() and (GroupLib.InGroup() or GroupLib.InRaid()))) then
+	-- necessary only one time
+	if self.active and (not GroupLib.InGroup() or GroupLib.AmILeader()) then
 		self.beenInGroup = true
 		GroupLib.AcceptRequest()
-		if Apollo.FindWindowByName("GroupRequestDialog") ~= nil then
-			Apollo.FindWindowByName("GroupRequestDialog"):Show(false)
-		end
 		self:ChangeSettings()
+	else
+		self.hooks[Apollo.GetAddon("GroupFrame")].OnGroupJoinRequest(strInviterName)
 	end
 end
 
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer OnGroupReferral: a group member invites another player. 
+--       Hide confirmation window
+-----------------------------------------------------------------------------------------------
 
 function AfRaidAnnouncer:OnGroupReferral(nMemberIndex, strTarget)
 	-- nMemberIndex invites strTarget to join our group: auto-accept
 	-- shouldn't be necessary if settings are correct
-	if self.active and (GroupLib.AmILeader() and (GroupLib.InGroup() or GroupLib.InRaid())) then
+	if self.active and GroupLib.InGroup() and GroupLib.AmILeader() then
 		self.beenInGroup = true
 		GroupLib.AcceptRequest()
-		if Apollo.FindWindowByName("GroupRequestDialog") ~= nil then
-			Apollo.FindWindowByName("GroupRequestDialog"):Show(false)
-		end
 		self:ChangeSettings()
+	else
+		self.hooks[Apollo.GetAddon("GroupFrame")].OnGroupReferral(nMemberIndex, strTarget)
 	end
 end
 
 
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer OnGroupAdd: someone joined (by using /join too)
+-----------------------------------------------------------------------------------------------
+
 function AfRaidAnnouncer:OnGroupAdd(strMemberName)
-	-- Someone else joined my group
 	self:ChangeSettings()
 end
 
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer OnSave: save settings
+-----------------------------------------------------------------------------------------------
 
 function AfRaidAnnouncer:OnSave(eType)
 	if eType ~= GameLib.CodeEnumAddonSaveLevel.Account then
@@ -241,6 +285,10 @@ function AfRaidAnnouncer:OnSave(eType)
 end
 
 
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouner OnRestore: load settings
+-----------------------------------------------------------------------------------------------
+
 function AfRaidAnnouncer:OnRestore(eType, tSavedData)
 	if eType ~= GameLib.CodeEnumAddonSaveLevel.Account then
 		return
@@ -253,6 +301,10 @@ function AfRaidAnnouncer:OnRestore(eType, tSavedData)
 	self.sanitize = tSavedData.sanitize
 end
 
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer OnChatMessage: search chat for keywords
+-----------------------------------------------------------------------------------------------
 
 function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 	-- tMessage has bAutoResponse, bGM, bSelf, strSender, strRealmName, nPresenceState, arMessageSegments, unitSource, bShowChatBubble, bCrossFaction, nReportId
@@ -274,7 +326,6 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 	
 	-- system message
 	if tMessage.strSender == "" then return end
-
 	
 	-- There will be a lot of chat messages, particularly for combat log.  If you make your own chat log module, you will want to batch
 	-- up several at a time and only process lines you expect to see.
@@ -282,10 +333,10 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 
 	local sMessage = ""
 	
-	
+
 	if eChannelType == ChatSystemLib.ChatChannel_Whisper or eChannelType == ChatSystemLib.ChatChannel_AccountWhisper or eChannelType == ChatSystemLib.ChatChannel_Say or eChannelType == ChatSystemLib.ChatChannel_Zone or eChannelType == ChatSystemLib.ChatChannel_Guild then
 		local bFound = false
-		for idx, tSegment in ipairs( tMessage.arMessageSegments ) do
+		for idx, tSegment in ipairs(tMessage.arMessageSegments) do
 			sMessage = string.lower(tSegment.strText)
 			for _,reiz in pairs(self.words) do
 				reiz = reiz:lower()
@@ -295,7 +346,7 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 			end
 		end
 		if bFound then
-		
+			-- found one of the keywords in the message
 			self:ChangeSettings()
 		
 			local announce = true
@@ -316,22 +367,20 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 					wen = tMessage.strSender
 				end
 				self:log(L["notInGroup"] .. " " .. wen)
-				GroupLib.Invite(tMessage.strSender)
+				self:Invite(tMessage.strSender)
 			else
 				if not GroupLib.InRaid() then 
 					if not GroupLib.AmILeader() then
 						announce = false
 					else
-						self:log(L["invited"])					
-						GroupLib.Invite(tMessage.strSender)
+						self:Invite(tMessage.strSender)
 					end
 				else
 					if not GroupLib.AmILeader() then
 						announce = false
 					else
 						if GroupLib.GetMemberCount() < 40 then
-							self:log(L["invited"])
-							GroupLib.Invite(tMessage.strSender)
+							self:Invite(tMessage.strSender)
 						else
 							self:log(L["full"])
 							announce = false
@@ -340,18 +389,25 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 				end
 			end
 	
-			if announce and self.werbungreplaced ~= "" then		
-		        for _,channel in pairs(ChatSystemLib.GetChannels()) do
-		        	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
-				        channel:Send(self.werbungreplaced)
-						self.counter = 300
-		    	    end
+			if announce and self.werbungreplaced ~= "" then
+				if GroupLib.InGroup() then
+			        for _,channel in pairs(ChatSystemLib.GetChannels()) do
+			        	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
+					        channel:Send(self.werbungreplaced)
+							self.counter = 300
+			    	    end
+					end
 				end
 			end
 		end
 	end
 end
 
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer ChangeSettings: converting group to raid, setting invitation and referral
+--       settings regularly
+-----------------------------------------------------------------------------------------------
 
 function AfRaidAnnouncer:ChangeSettings()
 	if GroupLib.InGroup() then
@@ -378,6 +434,10 @@ function AfRaidAnnouncer:ChangeSettings()
 end
 
 
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer OnGroupLeft: I have left the group
+-----------------------------------------------------------------------------------------------
+
 function AfRaidAnnouncer:OnGroupLeft(eReason)
 	local unitMe = GameLib.GetPlayerUnit()
 	if unitMe == nil then
@@ -388,7 +448,10 @@ function AfRaidAnnouncer:OnGroupLeft(eReason)
 end
 
 
--- kick players offline for over 5 minutes
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer SanitizeRaid: kick players offline for over 5 minutes
+-----------------------------------------------------------------------------------------------
+
 function AfRaidAnnouncer:SanitizeRaid()
 	local nMembers = GroupLib.GetMemberCount()
 	local nCount = 0
@@ -420,6 +483,10 @@ function AfRaidAnnouncer:SanitizeRaid()
 end
 
 
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer log: display message in system log
+-----------------------------------------------------------------------------------------------
+
 function AfRaidAnnouncer:log (strMeldung)
 	if strMeldung == nil then strMeldung = "nil" end
 	ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "[afRaidAnnouncer]: "..strMeldung)
@@ -427,22 +494,49 @@ end
 
 
 -----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer Invite: invite to group by playername if not already in our group
+-----------------------------------------------------------------------------------------------
+
+function AfRaidAnnouncer:Invite(strPlayername)
+	local bFound = false
+	if GroupLib.InGroup() then
+		local nMembers = GroupLib.GetMemberCount()
+		if nMembers > 0 then
+			for idx = nMembers, 1, -1 do
+				local tMemberInfo = GroupLib.GetGroupMember(idx)
+				if tMemberInfo ~= nil then
+					local sCharname = tMemberInfo.strCharacterName
+					if sCharname == strPlayername then
+						bFound = true
+					end
+				end
+			end	
+		end
+	end
+	if not bFound then
+		self:log(L["invited"])					
+		GroupLib.Invite(strPlayername)
+	end
+end
+
+-----------------------------------------------------------------------------------------------
 -- AfRaidAnnouncerForm Functions
 -----------------------------------------------------------------------------------------------
 -- when the OK button is clicked
 function AfRaidAnnouncer:OnOK()
-
 	-- user wants to activate it, sanity check
 	if self.wndMain:FindChild("active"):IsChecked() then
 		if GroupLib.InGroup() and not GroupLib.AmILeader() then
 			self.wndMain:FindChild("active"):SetCheck(false);
-			self.log = L["YouNoLeader"]
+			self:log(L["YouNoLeader"])
 			return
 		end
 	end
 	
+	-- empty offline table
 	for k,v in pairs(self.offline) do self.offline[k] = nil end
 
+	-- divide string into table of keywords
 	local words = self.wndMain:FindChild("ReizWort"):GetText()
 	self.words = {}
 	for wort in string.gmatch(words, '([^,]+)') do
@@ -470,6 +564,7 @@ function AfRaidAnnouncer:OnOK()
 	
 	local entry = {["werbung"] = self.werbung, ["words"] = self.words}
 	
+	-- update or insert history table entry
 	local found = false
 	for idx, hentry in pairs(self.history) do
 		if hentry["words"][1] == self.words[1] then
@@ -491,6 +586,7 @@ function AfRaidAnnouncer:OnCancel()
 end
 
 
+-- delete items from history list
 function AfRaidAnnouncer:OnDeleteHistoryItem(wndHandler, wndControl)
 	local idx = wndHandler:GetParent():GetData()
 	table.remove(self.history, idx)
@@ -500,6 +596,7 @@ function AfRaidAnnouncer:OnDeleteHistoryItem(wndHandler, wndControl)
 end
 
 
+-- load saved settings from history
 function AfRaidAnnouncer:OnHistoryItem(wndHandler, wndControl)
 	local idx = wndHandler:GetParent():GetData()
 	self.words = self.history[idx]["words"]
