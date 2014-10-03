@@ -147,6 +147,8 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self.wndMain:FindChild("werbungtime"):SetCheck(self.werbungtime)
 	self.wndMain:FindChild("werbungreply"):SetCheck(self.werbungreply)
 	self.wndMain:FindChild("chkSanitize"):SetCheck(self.sanitize)
+	self.wndMain:FindChild("active"):SetCheck(self.active)
+
 	
 	-- History
 	local container = self.wndMain:FindChild("container")
