@@ -38,6 +38,8 @@ function AfRaidAnnouncer:new(o)
 	self.history = {}
 	self.beenInGroup = false
 	self.offline = {}
+	self.blacklist = {}
+	self.useBlacklist = true
     return o
 end
 
@@ -141,13 +143,21 @@ end
 -----------------------------------------------------------------------------------------------
 
 function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
+	if self.wndMain:IsShown() then 
+		self.wndMain:Close() 
+		return
+	end
+
 	self.wndMain:Invoke() -- show the window
+	self.wndMain:FindChild("Blacklist"):Show(false)
 	
 	self:refreshWords()
 	self.wndMain:FindChild("werbungtime"):SetCheck(self.werbungtime)
 	self.wndMain:FindChild("werbungreply"):SetCheck(self.werbungreply)
 	self.wndMain:FindChild("chkSanitize"):SetCheck(self.sanitize)
 	self.wndMain:FindChild("active"):SetCheck(self.active)
+	self.wndMain:FindChild("UseBlacklist"):SetCheck(self.useBlacklist)
+
 
 	
 	-- History
@@ -173,6 +183,13 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self.wndMain:FindChild("werbungreply"):SetText(L["lblWerbungreply"])
 	self.wndMain:FindChild("CancelButton"):SetText(L["lblCancel"])
 	self.wndMain:FindChild("chkSanitize"):SetText(L["lblSanitize"])
+
+	self.wndMain:FindChild("lblLeech"):SetText(L["lblLeech"])
+	self.wndMain:FindChild("lblRemoveBlacklist"):SetText(L["lblRemoveBlacklist"])
+	self.wndMain:FindChild("lblManualBlacklist"):SetText(L["lblManualBlacklist"])
+	self.wndMain:FindChild("lblAdd"):SetText(L["lblAdd"])
+	self.wndMain:FindChild("UseBlacklist"):SetText(L["lblUseBlacklist"])
+	
 	self.wndMain:FindChild("chkSanitize"):SetTooltip(L["ttSanitize"])
 	self.wndMain:FindChild("werbungtime"):SetTooltip(L["onlyGroup"])
 	self.wndMain:FindChild("werbungreply"):SetTooltip(L["onlyGroup"])
@@ -233,8 +250,12 @@ function AfRaidAnnouncer:OnGroupJoinRequest(strInviterName)
 	-- necessary only one time
 	if self.active and (not GroupLib.InGroup() or GroupLib.AmILeader()) then
 		self.beenInGroup = true
-		GroupLib.AcceptRequest()
-		self:ChangeSettings()
+		if self:IsOnBlacklist(strInviterName) then
+			GroupLib.DenyRequest()
+		else
+			GroupLib.AcceptRequest()
+			self:ChangeSettings()
+		end
 	else
 		self.hooks[Apollo.GetAddon("GroupFrame")].OnGroupJoinRequest(strInviterName)
 	end
@@ -265,6 +286,9 @@ end
 
 function AfRaidAnnouncer:OnGroupAdd(strMemberName)
 	self:ChangeSettings()
+	if self:IsOnBlacklist(strMemberName) then
+		self:Kick(strMemberName)
+	end
 end
 
 
@@ -283,6 +307,8 @@ function AfRaidAnnouncer:OnSave(eType)
 	tSavedData.werbungreply = self.werbungreply
 	tSavedData.history = self.history
 	tSavedData.sanitize = self.sanitize
+	tSavedData.blacklist = self.blacklist
+	tSavedData.useBlacklist = self.useBlacklist
 	return tSavedData
 end
 
@@ -301,6 +327,10 @@ function AfRaidAnnouncer:OnRestore(eType, tSavedData)
 	self.werbungreply = tSavedData.werbungreply
 	self.history = tSavedData.history
 	self.sanitize = tSavedData.sanitize
+	self.blacklist = tSavedData.blacklist
+	self.useBlacklist = tSavedData.useBlacklist
+	if self.useBlacklist == nil then self.useBlacklist = true end
+	if self.blacklist == nil then self.blacklist = {} end
 end
 
 
@@ -466,18 +496,23 @@ function AfRaidAnnouncer:SanitizeRaid()
 			local tMemberInfo = GroupLib.GetGroupMember(idx)
 			if tMemberInfo ~= nil then
 				local sCharname = tMemberInfo.strCharacterName
-				if tMemberInfo.bIsOnline then
-					self.offline[sCharname] = nil
+				if self:IsOnBlacklist(sCharname:lower()) then
+					GroupLib.Kick(idx, "")
+					self:log(L["blocked"])
 				else
-					if self.offline[sCharname] == nil then
-						self.offline[sCharname] = os.time()
+					if tMemberInfo.bIsOnline then
+						self.offline[sCharname] = nil
 					else
-						if self.sanitize then
-							if nNow > (self.offline[sCharname] + 300) then
-								local message = L["offline"]
-								message = string.gsub(message,"%[USER%]",sCharname)
-								self:log(message)
-								GroupLib.Kick(idx, "")
+						if self.offline[sCharname] == nil then
+							self.offline[sCharname] = os.time()
+						else
+							if self.sanitize then
+								if nNow > (self.offline[sCharname] + 300) then
+									local message = L["offline"]
+									message = string.gsub(message,"%[USER%]",sCharname)
+									self:log(message)
+									GroupLib.Kick(idx, "")
+								end
 							end
 						end
 					end
@@ -494,7 +529,7 @@ end
 
 function AfRaidAnnouncer:log (strMeldung)
 	if strMeldung == nil then strMeldung = "nil" end
-	ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "[afRaidAnnouncer]: "..strMeldung)
+	ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, strMeldung, "afRaidAnnouncer")
 end
 
 
@@ -519,10 +554,105 @@ function AfRaidAnnouncer:Invite(strPlayername)
 		end
 	end
 	if not bFound then
-		self:log(L["invited"])					
-		GroupLib.Invite(strPlayername)
+		if self:IsOnBlacklist(strPlayername) then
+			self:log(L["blocked"])
+		else
+			self:log(L["invited"])					
+			GroupLib.Invite(strPlayername)
+		end
 	end
 end
+
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer Kick: Kick player from group by name
+-----------------------------------------------------------------------------------------------
+
+function AfRaidAnnouncer:Kick(strPlayer)
+	local nMembers = GroupLib.GetMemberCount()
+	local strLower = strPlayer:lower()
+	if nMembers > 0 then
+		for idx = nMembers, 1, -1 do
+			local tMemberInfo = GroupLib.GetGroupMember(idx)
+			if tMemberInfo ~= nil then
+				local sCharname = tMemberInfo.strCharacterName
+				if sCharname:lower() == strLower then
+					GroupLib.Kick(idx, "")
+					return
+				end
+			end
+		end	
+	end
+end
+
+
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer RefreshBlacklist: refreshes GUI Lists
+-----------------------------------------------------------------------------------------------
+
+function AfRaidAnnouncer:RefreshBlacklist()
+	local nMembers = GroupLib.GetMemberCount()
+	local wndPlayerlist = self.wndMain:FindChild("Playerlist")
+	local wndBlacklist = self.wndMain:FindChild("Blacklistlist")
+	local drPlayer = GameLib.GetPlayerUnit()
+	local strName = drPlayer and drPlayer:GetName() or ""
+	local bFound = false
+
+	wndPlayerlist:DestroyChildren()
+	wndBlacklist:DestroyChildren()
+	
+	if nMembers > 0 then
+		for idx = 1, nMembers do
+			local tMemberInfo = GroupLib.GetGroupMember(idx)
+			if tMemberInfo ~= nil then
+				local sCharname = tMemberInfo.strCharacterName
+				if sCharname ~= strName then
+				
+					bFound = false
+					for idx, strName in pairs(self.blacklist) do
+						if self.blacklist[idx] == sCharname then
+							bFound = true
+						end
+					end
+
+					if not bFound then
+						local wndCurr = Apollo.LoadForm(self.xmlDoc, "PlayerlistItem", wndPlayerlist, self)
+						wndCurr:SetData(sCharname)
+						wndCurr:FindChild("Button"):SetText(sCharname)
+					end
+				end
+			end
+		end	
+	end
+	wndPlayerlist:ArrangeChildrenVert()
+	
+	for idx, strBlackname in pairs(self.blacklist) do
+		local wndCurr = Apollo.LoadForm(self.xmlDoc, "BlacklistItem", wndBlacklist, self)
+		wndCurr:SetData(strBlackname)
+		wndCurr:FindChild("Button"):SetText(strBlackname)
+	end		
+	wndBlacklist:ArrangeChildrenVert()
+	
+end
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer IsOnBlacklist: check if playername is found on our blacklist
+-----------------------------------------------------------------------------------------------
+
+function AfRaidAnnouncer:IsOnBlacklist(strPlayername)
+	if not self.useBlacklist then
+		return false
+	end
+	local strLower = strPlayername:lower()
+	for idx, strName in pairs(self.blacklist) do
+		if strName:lower() == strLower then
+			return true
+		end
+	end
+	return false
+end
+
 
 -----------------------------------------------------------------------------------------------
 -- AfRaidAnnouncerForm Functions
@@ -563,6 +693,7 @@ function AfRaidAnnouncer:OnOK()
 	self.werbung  = self.wndMain:FindChild("werbung"):GetText()
 	self.werbungtime = self.wndMain:FindChild("werbungtime"):IsChecked()
 	self.werbungreply = self.wndMain:FindChild("werbungreply"):IsChecked()
+	self.useBlacklist = self.wndMain:FindChild("UseBlacklist"):IsChecked()
 	local drPlayer = GameLib.GetPlayerUnit()
 	local strName = drPlayer and drPlayer:GetName() or "me"
 	self.werbungreplaced = string.gsub(self.werbung, "%[me%]", strName)
@@ -609,6 +740,65 @@ function AfRaidAnnouncer:OnHistoryItem(wndHandler, wndControl)
 	self:refreshWords()
 end
 
+
+-- toggle blacklist
+function AfRaidAnnouncer:ToggleBlacklist()
+	local wBlacklist = self.wndMain:FindChild("Blacklist")
+	if wBlacklist:IsShown() then
+		wBlacklist:Show(false)
+	else
+		wBlacklist:Show(true)
+		self:RefreshBlacklist()
+	end
+end
+
+
+-- get playername for blacklist from user entry
+function AfRaidAnnouncer:OnManuallAddPlayer(wndHandler, wndControl, eMouseButton)
+	local wndName = self.wndMain:FindChild("BlacklistName")
+	local sPlayer = wndName:GetText()
+	self:AddPlayerToBlacklist(sPlayer)
+	wndName:SetText("")
+	self:RefreshBlacklist()
+end
+
+
+-- remove player from blacklist
+function AfRaidAnnouncer:OnBlacklistItem(wndHandler, wndControl, eMouseButton)
+	local sPlayer = wndHandler:GetParent():GetData()
+	for idx, strName in pairs(self.blacklist) do
+		if self.blacklist[idx] == sPlayer then
+			self.blacklist[idx] = nil
+		end
+	end
+	self:RefreshBlacklist()
+end
+
+
+-- add selected player to blacklist
+function AfRaidAnnouncer:AddPlayerToBlacklist(strPlayername)
+	local bFound = false
+	local strLower = strPlayername:lower()
+	for idx, strName in pairs(self.blacklist) do
+		if self.blacklist[idx]:lower() == strLower then
+			bFound = true
+		end
+	end
+	if not bFound then
+		self:RefreshBlacklist()	table.insert(self.blacklist, strPlayername)
+	end
+end
+
+
+---------------------------------------------------------------------------------------------------
+-- PlayerlistItem Functions
+---------------------------------------------------------------------------------------------------
+
+function AfRaidAnnouncer:OnPlayerlistItem(wndHandler, wndControl, eMouseButton)
+	local sPlayer = wndHandler:GetParent():GetData()
+	self:AddPlayerToBlacklist(sPlayer)
+	self:RefreshBlacklist()
+end
 
 -----------------------------------------------------------------------------------------------
 -- AfRaidAnnouncer Instance
