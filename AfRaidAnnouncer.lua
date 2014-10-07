@@ -97,6 +97,7 @@ function AfRaidAnnouncer:OnDocLoaded()
 		self:RawHook(Apollo.GetAddon("GroupFrame"), "OnGroupReferral")
 	
 		-- Do additional Addon initialization here
+		self:Activate(false)
 	end
 end
 
@@ -452,7 +453,7 @@ function AfRaidAnnouncer:ChangeSettings()
 		if not GroupLib.InRaid() then 
 			if not GroupLib.AmILeader() then
 				self:log(L["noGroupRights"])
-				self.active = false
+				self:Activate(false)
 			else
 				self:log(L["converting"])
 				GroupLib.ConvertToRaid()
@@ -460,7 +461,7 @@ function AfRaidAnnouncer:ChangeSettings()
 		else
 			if not GroupLib.AmILeader() then
 				self:log(L["noLead"])
-				self.active = false
+				self:Activate(false)
 			end
 		end
 	end
@@ -478,7 +479,7 @@ function AfRaidAnnouncer:OnGroupLeft(eReason)
     end
 	if self.active then
 		self:log(L["left"])
-		self.active = false
+		self:Activate(false)
 	end
 end
 
@@ -496,7 +497,7 @@ function AfRaidAnnouncer:SanitizeRaid()
 			local tMemberInfo = GroupLib.GetGroupMember(idx)
 			if tMemberInfo ~= nil then
 				local sCharname = tMemberInfo.strCharacterName
-				if self:IsOnBlacklist(sCharname:lower()) then
+				if self:IsOnBlacklist(sCharname) then
 					GroupLib.Kick(idx, "")
 					self:log(L["blocked"])
 				else
@@ -643,6 +644,7 @@ function AfRaidAnnouncer:IsOnBlacklist(strPlayername)
 	if not self.useBlacklist then
 		return false
 	end
+	if strPlayerName == nil then return false end
 	local strLower = strPlayername:lower()
 	for idx, strName in pairs(self.blacklist) do
 		if strName:lower() == strLower then
@@ -652,6 +654,19 @@ function AfRaidAnnouncer:IsOnBlacklist(strPlayername)
 	return false
 end
 
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer Activate: enable/disable addon
+-----------------------------------------------------------------------------------------------
+
+function AfRaidAnnouncer:Activate(bState)
+	self.active = bState
+	if bState then
+		self.timer:Start()
+	else
+		self.timer:Stop()
+	end
+end
 
 -----------------------------------------------------------------------------------------------
 -- AfRaidAnnouncerForm Functions
@@ -683,10 +698,10 @@ function AfRaidAnnouncer:OnOK()
 		self.counter = 2
 	end
 
-	self.active = self.wndMain:FindChild("active"):IsChecked()
+	self:Activate(self.wndMain:FindChild("active"):IsChecked())
 	self.sanitize = self.wndMain:FindChild("chkSanitize"):IsChecked()
 	
-	if self.active and self.counter == 0 then
+	if self.wndMain:FindChild("active"):IsChecked() and self.counter == 0 then
 		self.counter = 2
 	end
 	self.werbung  = self.wndMain:FindChild("werbung"):GetText()
