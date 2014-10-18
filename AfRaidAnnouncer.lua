@@ -721,14 +721,12 @@ end
 -----------------------------------------------------------------------------------------------
 
 function AfRaidAnnouncer:CheckChecks()
-	self:log("check")
 	local english = self.wndMain:FindChild("chk_english"):IsChecked()
 	local german = self.wndMain:FindChild("chk_german"):IsChecked()
 	local french = self.wndMain:FindChild("chk_french"):IsChecked()
 	
 	if (not english) and (not german) and (not french) then
 		self.wndMain:FindChild("chk_english"):SetCheck(true)
-		self:log("oho")
 	end
 end
 
