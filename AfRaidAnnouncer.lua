@@ -154,12 +154,15 @@ end
 
 function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	if self.wndMain:IsShown() then 
+		self.location = self.wndMain:GetLocation()
 		self.wndMain:Close() 
 		return
 	end
 
 	self.wndMain:Invoke() -- show the window
 	self.wndMain:FindChild("Blacklist"):Show(false)
+	
+	if self.location then self.wndMain:MoveToLocation(self.location) end
 	
 	self:refreshWords()
 	self.wndMain:FindChild("werbungtime"):SetCheck(self.werbungtime)
@@ -321,6 +324,7 @@ function AfRaidAnnouncer:OnSave(eType)
 	tSavedData.english = self.english
 	tSavedData.german = self.german
 	tSavedData.french = self.french
+	tSavedData.location = self.location and self.location:ToTable() or nil
 	return tSavedData
 end
 
@@ -346,6 +350,7 @@ function AfRaidAnnouncer:OnRestore(eType, tSavedData)
 	if tSavedData.english ~= nil then self.english = tSavedData.english end
 	if tSavedData.german ~= nil then self.german = tSavedData.german end
 	if tSavedData.french ~= nil then self.french = tSavedData.french end
+	if tSavedData.location ~= nil then self.location = WindowLocation.new(tSavedData.location) end
 end
 
 
@@ -736,6 +741,8 @@ end
 -----------------------------------------------------------------------------------------------
 -- when the OK button is clicked
 function AfRaidAnnouncer:OnOK()
+	self.location = self.wndMain:GetLocation()
+
 	-- user wants to activate it, sanity check
 	if self.wndMain:FindChild("active"):IsChecked() then
 		if GroupLib.InGroup() and not GroupLib.AmILeader() then
@@ -806,6 +813,7 @@ end
 
 -- when the Cancel button is clicked
 function AfRaidAnnouncer:OnCancel()
+	self.location = self.wndMain:GetLocation()
 	self.wndMain:Close() -- hide the window
 end
 
