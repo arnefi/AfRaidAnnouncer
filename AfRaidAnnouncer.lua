@@ -31,8 +31,12 @@ function AfRaidAnnouncer:new(o)
 	self.words = {}
 	self.active = false
 	self.werbung = ""
+	self.werbungGerman = ""
+	self.werbungFrench = ""
 	self.sanitize = false
 	self.werbungreplaced = ""
+	self.werbungreplacedGerman = ""
+	self.werbungreplacedFrench = ""
 	self.werbungtime = false
 	self.werbungreply = true
 	self.history = {}
@@ -40,6 +44,9 @@ function AfRaidAnnouncer:new(o)
 	self.offline = {}
 	self.blacklist = {}
 	self.useBlacklist = true
+	self.english = true
+	self.german = false
+	self.french = false
     return o
 end
 
@@ -136,6 +143,8 @@ function AfRaidAnnouncer:refreshWords()
 	else
 		self.wndMain:FindChild("werbung"):SetText(self.werbung)
 	end
+	self.wndMain:FindChild("werbungGerman"):SetText(self.werbungGerman)
+	self.wndMain:FindChild("werbungFrench"):SetText(self.werbungFrench)
 end
 
 
@@ -158,8 +167,10 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self.wndMain:FindChild("chkSanitize"):SetCheck(self.sanitize)
 	self.wndMain:FindChild("active"):SetCheck(self.active)
 	self.wndMain:FindChild("UseBlacklist"):SetCheck(self.useBlacklist)
-
-
+	
+	self.wndMain:FindChild("chk_english"):SetCheck(self.english)
+	self.wndMain:FindChild("chk_german"):SetCheck(self.german)
+	self.wndMain:FindChild("chk_french"):SetCheck(self.french)
 	
 	-- History
 	local container = self.wndMain:FindChild("container")
@@ -207,15 +218,10 @@ function AfRaidAnnouncer:OnTimer()
 	if self.counter > 0 then
 		self.counter = self.counter - 1
 		if self.counter == 0 then
-			if self.active and self.werbungtime and self.werbungreplaced ~= "" then
+			if self.active and self.werbungtime then
 				if GroupLib.GetMemberCount() < 40 then
 					if GroupLib.InGroup() then
-						for _,channel in pairs(ChatSystemLib.GetChannels()) do
-				        	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
-						        channel:Send(self.werbungreplaced)
-								self.counter = 300
-				    	    end
-						end
+						self:PostTeaser()
 					else
 						-- don't post if not in group already
 						-- otherwise the joining player will be lead
@@ -304,12 +310,17 @@ function AfRaidAnnouncer:OnSave(eType)
 	local tSavedData = {}
 	tSavedData.words = self.words
 	tSavedData.werbung = self.werbung
+	tSavedData.werbungGerman = self.werbungGerman
+	tSavedData.werbungFrench = self.werbungFrench
 	tSavedData.werbungtime = self.werbungtime
 	tSavedData.werbungreply = self.werbungreply
 	tSavedData.history = self.history
 	tSavedData.sanitize = self.sanitize
 	tSavedData.blacklist = self.blacklist
 	tSavedData.useBlacklist = self.useBlacklist
+	tSavedData.english = self.english
+	tSavedData.german = self.german
+	tSavedData.french = self.french
 	return tSavedData
 end
 
@@ -324,12 +335,17 @@ function AfRaidAnnouncer:OnRestore(eType, tSavedData)
 	end
 	if tSavedData.words ~= nil then self.words = tSavedData.words end
 	if tSavedData.werbung ~= nil then self.werbung = tSavedData.werbung end
+	if tSavedData.werbungGerman ~= nil then self.werbungGerman = tSavedData.werbungGerman end
+	if tSavedData.werbungFrench ~= nil then self.werbungFrench = tSavedData.werbungFrench end
 	if tSavedData.werbungtime ~= nil then self.werbungtime = tSavedData.werbungtime end
 	if tSavedData.werbungreply ~= nil then self.werbungreply = tSavedData.werbungreply end
 	if tSavedData.history ~= nil then self.history = tSavedData.history end
 	if tSavedData.sanitize ~= nil then self.sanitize = tSavedData.sanitize end
 	if tSavedData.Blacklist ~= nil then self.blacklist = tSavedData.blacklist end
 	if tSavedData.useBlacklist ~= nil then self.useBlacklist = tSavedData.useBlacklist end
+	if tSavedData.english ~= nil then self.english = tSavedData.english end
+	if tSavedData.german ~= nil then self.german = tSavedData.german end
+	if tSavedData.french ~= nil then self.french = tSavedData.french end
 end
 
 
@@ -365,7 +381,7 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 	local sMessage = ""
 	
 
-	if eChannelType == ChatSystemLib.ChatChannel_Whisper or eChannelType == ChatSystemLib.ChatChannel_AccountWhisper or eChannelType == ChatSystemLib.ChatChannel_Say or eChannelType == ChatSystemLib.ChatChannel_Zone or eChannelType == ChatSystemLib.ChatChannel_Guild then
+	if eChannelType == ChatSystemLib.ChatChannel_Whisper or eChannelType == ChatSystemLib.ChatChannel_AccountWhisper or eChannelType == ChatSystemLib.ChatChannel_Say or eChannelType == ChatSystemLib.ChatChannel_Zone or eChannelType == ChatSystemLib.ChatChannel_ZoneGerman or eChannelType == ChatSystemLib.ChatChannel_ZoneFrench or eChannelType == ChatSystemLib.ChatChannel_Guild then
 		local bFound = false
 		for idx, tSegment in ipairs(tMessage.arMessageSegments) do
 			sMessage = string.lower(tSegment.strText)
@@ -420,14 +436,47 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 				end
 			end
 	
-			if announce and self.werbungreplaced ~= "" then
+			if announce then
 				if GroupLib.InGroup() then
-			        for _,channel in pairs(ChatSystemLib.GetChannels()) do
-			        	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
-					        channel:Send(self.werbungreplaced)
-							self.counter = 300
-			    	    end
-					end
+					self:PostTeaser()
+				end
+			end
+		end
+	end
+end
+
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer PostTeaser: post teaser on selected channels
+-----------------------------------------------------------------------------------------------
+
+function AfRaidAnnouncer:PostTeaser()
+    for _,channel in pairs(ChatSystemLib.GetChannels()) do
+    	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
+			if self.english and self.werbungreplaced ~= "" then
+		        channel:Send(self.werbungreplaced)
+				self.counter = 300
+			end
+	    end
+    	if channel:GetType() == ChatSystemLib.ChatChannel_ZoneGerman then
+			if self.german then
+				if self.werbungreplacedGerman ~= "" then
+			        channel:Send(self.werbungreplacedGerman)
+					self.counter = 300
+				elseif self.werbungreplaced ~= "" then
+			        channel:Send(self.werbungreplaced)
+					self.counter = 300
+				end
+			end
+	    end
+    	if channel:GetType() == ChatSystemLib.ChatChannel_ZoneFrench then
+			if self.french then
+				if self.werbungreplacedFrench ~= "" then
+			        channel:Send(self.werbungreplacedFrench)
+					self.counter = 300
+				elseif self.werbungreplaced ~= "" then
+			        channel:Send(self.werbungreplaced)
+					self.counter = 300
 				end
 			end
 		end
@@ -666,6 +715,24 @@ function AfRaidAnnouncer:Activate(bState)
 	end
 end
 
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer CheckChecks: check the state of the checkboxes
+-----------------------------------------------------------------------------------------------
+
+function AfRaidAnnouncer:CheckChecks()
+	self:log("check")
+	local english = self.wndMain:FindChild("chk_english"):IsChecked()
+	local german = self.wndMain:FindChild("chk_german"):IsChecked()
+	local french = self.wndMain:FindChild("chk_french"):IsChecked()
+	
+	if (not english) and (not german) and (not french) then
+		self.wndMain:FindChild("chk_english"):SetCheck(true)
+		self:log("oho")
+	end
+end
+
+
 -----------------------------------------------------------------------------------------------
 -- AfRaidAnnouncerForm Functions
 -----------------------------------------------------------------------------------------------
@@ -703,14 +770,25 @@ function AfRaidAnnouncer:OnOK()
 		self.counter = 2
 	end
 	self.werbung  = self.wndMain:FindChild("werbung"):GetText()
+	self.werbungGerman  = self.wndMain:FindChild("werbungGerman"):GetText()
+	self.werbungFrench  = self.wndMain:FindChild("werbungFrench"):GetText()
+	
 	self.werbungtime = self.wndMain:FindChild("werbungtime"):IsChecked()
 	self.werbungreply = self.wndMain:FindChild("werbungreply"):IsChecked()
 	self.useBlacklist = self.wndMain:FindChild("UseBlacklist"):IsChecked()
+	
+	self.english = self.wndMain:FindChild("chk_english"):IsChecked()
+	self.german = self.wndMain:FindChild("chk_german"):IsChecked()
+	self.french = self.wndMain:FindChild("chk_french"):IsChecked()
+
 	local drPlayer = GameLib.GetPlayerUnit()
 	local strName = drPlayer and drPlayer:GetName() or "me"
 	self.werbungreplaced = string.gsub(self.werbung, "%[me%]", strName)
+	self.werbungreplacedGerman = string.gsub(self.werbungGerman, "%[me%]", strName)
+	self.werbungreplacedFrench = string.gsub(self.werbungFrench, "%[me%]", strName)
+
 	
-	local entry = {["werbung"] = self.werbung, ["words"] = self.words}
+	local entry = {["werbung"] = self.werbung, ["words"] = self.words, ["werbungGerman"] = self.werbungGerman, ["werbungFrench"] = self.werbungFrench}
 	
 	-- update or insert history table entry
 	local found = false
@@ -749,6 +827,16 @@ function AfRaidAnnouncer:OnHistoryItem(wndHandler, wndControl)
 	local idx = wndHandler:GetParent():GetData()
 	self.words = self.history[idx]["words"]
 	self.werbung = self.history[idx]["werbung"]
+	if self.history[idx]["werbungGerman"] ~= nil then
+		self.werbungGerman = self.history[idx]["werbungGerman"]
+	else
+		self.werbungGerman = ""
+	end
+	if self.history[idx]["werbungFrench"] ~= nil then
+		self.werbungFrench = self.history[idx]["werbungFrench"]
+	else
+		self.werbungFrench = ""
+	end
 	self:refreshWords()
 end
 
