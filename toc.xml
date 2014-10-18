@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="arnefi" APIVersion="9" Name="AfRaidAnnouncer" Description="Announces raids in zone and invites on keywords" Version="1.4.1">
+<Addon Author="arnefi" APIVersion="9" Name="AfRaidAnnouncer" Description="Announces raids in zone and invites on keywords" Version="1.4.2">
     <Script Name="libs/GeminiLocale/GeminiLocale.lua"/>
     <Script Name="locale/enUS.lua"/>
     <Script Name="locale/deDE.lua"/>
