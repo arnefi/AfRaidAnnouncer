@@ -322,16 +322,14 @@ function AfRaidAnnouncer:OnRestore(eType, tSavedData)
 	if eType ~= GameLib.CodeEnumAddonSaveLevel.Account then
 		return
 	end
-	self.words = tSavedData.words
-	self.werbung = tSavedData.werbung
-	self.werbungtime = tSavedData.werbungtime
-	self.werbungreply = tSavedData.werbungreply
-	self.history = tSavedData.history
-	self.sanitize = tSavedData.sanitize
-	self.blacklist = tSavedData.blacklist
-	self.useBlacklist = tSavedData.useBlacklist
-	if self.useBlacklist == nil then self.useBlacklist = true end
-	if self.blacklist == nil then self.blacklist = {} end
+	if tSavedData.words ~= nil then self.words = tSavedData.words end
+	if tSavedData.werbung ~= nil then self.werbung = tSavedData.werbung end
+	if tSavedData.werbungtime ~= nil then self.werbungtime = tSavedData.werbungtime end
+	if tSavedData.werbungreply ~= nil then self.werbungreply = tSavedData.werbungreply end
+	if tSavedData.history ~= nil then self.history = tSavedData.history end
+	if tSavedData.sanitize ~= nil then self.sanitize = tSavedData.sanitize end
+	if tSavedData.Blacklist ~= nil then self.blacklist = tSavedData.blacklist end
+	if tSavedData.useBlacklist ~= nil then self.useBlacklist = tSavedData.useBlacklist end
 end
 
 
