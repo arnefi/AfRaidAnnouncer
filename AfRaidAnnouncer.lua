@@ -9,7 +9,7 @@ require "Window"
 -- AfRaidAnnouncer Module Definition
 -----------------------------------------------------------------------------------------------
 -- local AfRaidAnnouncer = {} 
-AfRaidAnnouncer = Apollo.GetPackage("Gemini:Addon-1.0").tPackage:NewAddon("AfRaidAnnouncer", false, {}, "Gemini:Hook-1.0")
+AfRaidAnnouncer = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("AfRaidAnnouncer", false, {}, "Gemini:Hook-1.0")
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:GetLocale("AfRaidAnnouncer", true)
  
 -----------------------------------------------------------------------------------------------
@@ -100,8 +100,10 @@ function AfRaidAnnouncer:OnDocLoaded()
 		Apollo.RegisterEventHandler("Group_Left", "OnGroupLeft", self)
 		self.timer = ApolloTimer.Create(1.0, true, "OnTimer", self)
 
-		self:RawHook(Apollo.GetAddon("GroupFrame"), "OnGroupJoinRequest")
-		self:RawHook(Apollo.GetAddon("GroupFrame"), "OnGroupReferral")
+		--self:RawHook(Apollo.GetAddon("GroupFrame"), "OnGroupJoinRequest")
+		--self:RawHook(Apollo.GetAddon("GroupFrame"), "OnGroupReferral")
+		self:RawHook(Apollo.GetAddon("GroupDisplay"), "OnGroupJoinRequest")
+		self:RawHook(Apollo.GetAddon("GroupDisplay"), "OnGroupReferral")
 	
 		-- Do additional Addon initialization here
 		self:Activate(false)
@@ -895,6 +897,16 @@ function AfRaidAnnouncer:AddPlayerToBlacklist(strPlayername)
 	end
 end
 
+
+
+-- toggle posting destination checkboxes.
+function AfRaidAnnouncer:PostToZone(wndHandler, wndControl, eMouseButton)
+	self.wndMain:FindChild("werbungreply"):SetCheck(false)
+end
+
+function AfRaidAnnouncer:PostOnWord(wndHandler, wndControl, eMouseButton)
+	self.wndMain:FindChild("werbungtime"):SetCheck(false)
+end
 
 ---------------------------------------------------------------------------------------------------
 -- PlayerlistItem Functions
