@@ -100,11 +100,12 @@ function AfRaidAnnouncer:OnDocLoaded()
 		Apollo.RegisterEventHandler("Group_Left", "OnGroupLeft", self)
 		self.timer = ApolloTimer.Create(1.0, true, "OnTimer", self)
 
-		--self:RawHook(Apollo.GetAddon("GroupFrame"), "OnGroupJoinRequest")
-		--self:RawHook(Apollo.GetAddon("GroupFrame"), "OnGroupReferral")
-		self:RawHook(Apollo.GetAddon("GroupDisplay"), "OnGroupJoinRequest")
-		self:RawHook(Apollo.GetAddon("GroupDisplay"), "OnGroupReferral")
-	
+		local otto = Apollo.GetAddon("GroupDisplay")
+		if otto then
+			self:RawHook(Apollo.GetAddon("GroupDisplay"), "OnGroupJoinRequest")
+			self:RawHook(Apollo.GetAddon("GroupDisplay"), "OnGroupReferral")
+		end
+		
 		-- Do additional Addon initialization here
 		self:Activate(false)
 	end
@@ -141,7 +142,11 @@ function AfRaidAnnouncer:refreshWords()
 	end
 	self.wndMain:FindChild("ReizWort"):SetText(words)
 	if self.werbung == "" then
-		self.wndMain:FindChild("werbung"):SetText(L["for"].." "..self.words[1].." /join [me].")
+		if self.words[1] then
+			self.wndMain:FindChild("werbung"):SetText(L["for"].." "..self.words[1].." /join [me].")
+		else
+			self.wndMain:FindChild("werbung"):SetText("/join [me].")
+		end
 	else
 		self.wndMain:FindChild("werbung"):SetText(self.werbung)
 	end
