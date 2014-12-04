@@ -29,6 +29,7 @@ function AfRaidAnnouncer:new(o)
 	self.counter = 0
 	self.sanitizeCounter = 0
 	self.words = {}
+	self.scanwords = {}
 	self.active = false
 	self.werbung = ""
 	self.werbungGerman = ""
@@ -358,6 +359,31 @@ function AfRaidAnnouncer:OnRestore(eType, tSavedData)
 	if tSavedData.german ~= nil then self.german = tSavedData.german end
 	if tSavedData.french ~= nil then self.french = tSavedData.french end
 	if tSavedData.location ~= nil then self.location = WindowLocation.new(tSavedData.location) end
+	self:RefreshScanwords()
+end
+
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouner RefreshScanwords: replace magic chars
+-----------------------------------------------------------------------------------------------
+
+function AfRaidAnnouncer:RefreshScanwords()
+	self.scanwords = {}
+	for idx, wort in pairs(self.words) do
+		wort = wort:gsub("%%", "%%%%")
+		wort = wort:gsub("%^", "%%%^")
+		wort = wort:gsub("%$", "%%%$")
+		wort = wort:gsub("%(", "%%%(")
+		wort = wort:gsub("%)", "%%%)")
+		wort = wort:gsub("%.", "%%%.")
+		wort = wort:gsub("%[", "%%%[")
+		wort = wort:gsub("%]", "%%%]")
+		wort = wort:gsub("%*", "%%%*")
+		wort = wort:gsub("%+", "%%%+")
+		wort = wort:gsub("%-", "%%%-")
+		wort = wort:gsub("%?", "%%%?")
+		self.scanwords[idx] = wort
+	end
 end
 
 
@@ -397,11 +423,23 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 		local bFound = false
 		for idx, tSegment in ipairs(tMessage.arMessageSegments) do
 			sMessage = string.lower(tSegment.strText)
-			for _,reiz in pairs(self.words) do
+			for _,reiz in pairs(self.scanwords) do
 				reiz = reiz:lower()
-				if string.find(sMessage, reiz, 1, true) then 
-					bFound = true
-				end			
+				
+				if reiz:len() <= 5 then
+					-- short keywords are most probably shortcuts like "LS" for lightspire
+					-- to not invite people using words like "ballsucker" (containig LS)
+					-- those short words have to stand alone
+					if string.find(sMessage, "%A"..reiz.."%A") or string.find(sMessage, "^"..reiz.."%A") or string.find(sMessage, "%A"..reiz.."$") or string.find(sMessage, "^"..reiz.."$") then
+						bFound = true
+					end
+				else
+					-- longer keywords can be contained in other words
+					-- "banana" would be triggered by "bananajoe", "mybanana" and "thismybanananotyours"
+					if string.find(sMessage, reiz, 1, true) then 
+						bFound = true
+					end	
+				end		
 			end
 		end
 		if bFound then
@@ -770,6 +808,8 @@ function AfRaidAnnouncer:OnOK()
 		table.insert(self.words, wort)
 	end
 	
+	self:RefreshScanwords()
+	
 	if not self.active and self.wndMain:FindChild("active"):IsChecked() then
 		self.beenInGroup = false
 		self.counter = 2
@@ -851,6 +891,7 @@ function AfRaidAnnouncer:OnHistoryItem(wndHandler, wndControl)
 		self.werbungFrench = ""
 	end
 	self:refreshWords()
+	self:RefreshScanwords()
 end
 
 
