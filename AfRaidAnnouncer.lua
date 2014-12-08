@@ -48,6 +48,9 @@ function AfRaidAnnouncer:new(o)
 	self.english = true
 	self.german = false
 	self.french = false
+	self.promote = true
+	self.promoteTimer = 0
+	self.leftGroup = true
     return o
 end
 
@@ -183,6 +186,8 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self.wndMain:FindChild("chk_german"):SetCheck(self.german)
 	self.wndMain:FindChild("chk_french"):SetCheck(self.french)
 	
+	self.wndMain:FindChild("chkPromote"):SetCheck(not self.promote)
+	
 	-- History
 	local container = self.wndMain:FindChild("container")
 	
@@ -206,7 +211,8 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self.wndMain:FindChild("werbungreply"):SetText(L["lblWerbungreply"])
 	self.wndMain:FindChild("CancelButton"):SetText(L["lblCancel"])
 	self.wndMain:FindChild("chkSanitize"):SetText(L["lblSanitize"])
-
+	self.wndMain:FindChild("chkPromote"):SetText(L["lblPromote"])
+	
 	self.wndMain:FindChild("lblLeech"):SetText(L["lblLeech"])
 	self.wndMain:FindChild("lblRemoveBlacklist"):SetText(L["lblRemoveBlacklist"])
 	self.wndMain:FindChild("lblManualBlacklist"):SetText(L["lblManualBlacklist"])
@@ -216,6 +222,7 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self.wndMain:FindChild("chkSanitize"):SetTooltip(L["ttSanitize"])
 	self.wndMain:FindChild("werbungtime"):SetTooltip(L["onlyGroup"])
 	self.wndMain:FindChild("werbungreply"):SetTooltip(L["onlyGroup"])
+	self.wndMain:FindChild("chkPromote"):SetTooltip(L["ttPromote"])
 end
 
 
@@ -255,6 +262,31 @@ function AfRaidAnnouncer:OnTimer()
 			self.sanitizeCounter = 10
 		end
 	end
+	
+	-- automatic promotion
+	if self.promoteTimer > 0 then
+		self.promoteTimer = self.promoteTimer - 1
+		if self.promoteTimer == 0 then
+			if self.active and self.promote then
+				if GroupLib.InGroup() then
+					if GroupLib.GetMemberCount() >= 10 then
+						self:doPromote()
+					else
+						self.promoteTimer = 120
+					end
+				end
+			end
+		end
+	end
+end
+
+
+-----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer promote: Promote the addon in the party channel if user activated this
+-----------------------------------------------------------------------------------------------
+
+function AfRaidAnnouncer:doPromote()
+	ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Party, "Automatic raid announcing and keyword based invitation by afRaidAnnouncer.", "afRaidAnnouncer")
 end
 
 
@@ -332,6 +364,7 @@ function AfRaidAnnouncer:OnSave(eType)
 	tSavedData.english = self.english
 	tSavedData.german = self.german
 	tSavedData.french = self.french
+	tSavedData.promote = self.promote
 	tSavedData.location = self.location and self.location:ToTable() or nil
 	return tSavedData
 end
@@ -358,6 +391,7 @@ function AfRaidAnnouncer:OnRestore(eType, tSavedData)
 	if tSavedData.english ~= nil then self.english = tSavedData.english end
 	if tSavedData.german ~= nil then self.german = tSavedData.german end
 	if tSavedData.french ~= nil then self.french = tSavedData.french end
+	if tSavedData.promote ~= nil then self.promote = tSavedData.promote end
 	if tSavedData.location ~= nil then self.location = WindowLocation.new(tSavedData.location) end
 	self:RefreshScanwords()
 end
@@ -412,13 +446,9 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 	-- system message
 	if tMessage.strSender == "" then return end
 	
-	-- There will be a lot of chat messages, particularly for combat log.  If you make your own chat log module, you will want to batch
-	-- up several at a time and only process lines you expect to see.
 	local eChannelType = channelCurrent:GetType()
-
 	local sMessage = ""
 	
-
 	if eChannelType == ChatSystemLib.ChatChannel_Whisper or eChannelType == ChatSystemLib.ChatChannel_AccountWhisper or eChannelType == ChatSystemLib.ChatChannel_Say or eChannelType == ChatSystemLib.ChatChannel_Zone or eChannelType == ChatSystemLib.ChatChannel_ZoneGerman or eChannelType == ChatSystemLib.ChatChannel_ZoneFrench or eChannelType == ChatSystemLib.ChatChannel_Guild then
 		local bFound = false
 		for idx, tSegment in ipairs(tMessage.arMessageSegments) do
@@ -791,7 +821,7 @@ function AfRaidAnnouncer:OnOK()
 	-- user wants to activate it, sanity check
 	if self.wndMain:FindChild("active"):IsChecked() then
 		if GroupLib.InGroup() and not GroupLib.AmILeader() then
-			self.wndMain:FindChild("active"):SetCheck(false);
+			self.wndMain:FindChild("active"):SetCheck(false)
 			self:log(L["YouNoLeader"])
 			return
 		end
@@ -813,6 +843,7 @@ function AfRaidAnnouncer:OnOK()
 	if not self.active and self.wndMain:FindChild("active"):IsChecked() then
 		self.beenInGroup = false
 		self.counter = 2
+		self.promoteTimer = 300
 	end
 
 	self:Activate(self.wndMain:FindChild("active"):IsChecked())
@@ -832,6 +863,8 @@ function AfRaidAnnouncer:OnOK()
 	self.english = self.wndMain:FindChild("chk_english"):IsChecked()
 	self.german = self.wndMain:FindChild("chk_german"):IsChecked()
 	self.french = self.wndMain:FindChild("chk_french"):IsChecked()
+	
+	self.promote = not self.wndMain:FindChild("chkPromote"):IsChecked()
 
 	local drPlayer = GameLib.GetPlayerUnit()
 	local strName = drPlayer and drPlayer:GetName() or "me"

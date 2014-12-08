@@ -26,3 +26,5 @@ L["lblRemoveBlacklist"] = "Auf einen Spilernamen klicken, um ihn von der Blackli
 L["lblManualBlacklist"] = "Manuell zur Blacklist hinzufügen:"
 L["lblAdd"] = "hinzufügen"
 L["lblUseBlacklist"] = "Blacklist nutzen"
+L["lblPromote"] = "nicht bewerben"
+L["ttPromote"] = "Das Addon wirbt einmal pro Raid für sich selbst im Gruppenchat."
