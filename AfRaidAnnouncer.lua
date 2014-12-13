@@ -268,12 +268,16 @@ function AfRaidAnnouncer:OnTimer()
 		self.promoteTimer = self.promoteTimer - 1
 		if self.promoteTimer == 0 then
 			if self.active and self.promote then
+				local bPromote = false
 				if GroupLib.InGroup() then
 					if GroupLib.GetMemberCount() >= 10 then
-						self:doPromote()
-					else
-						self.promoteTimer = 120
+						bPromote = true
 					end
+				end
+				if bPromote then
+					self:doPromote()
+				else
+					self.promoteTimer = 120
 				end
 			end
 		end
