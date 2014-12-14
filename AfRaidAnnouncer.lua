@@ -290,7 +290,11 @@ end
 -----------------------------------------------------------------------------------------------
 
 function AfRaidAnnouncer:doPromote()
-	ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Party, "Automatic raid announcing and keyword based invitation by afRaidAnnouncer.", "afRaidAnnouncer")
+	for _,channel in pairs(ChatSystemLib.GetChannels()) do
+    	if channel:GetType() == ChatSystemLib.ChatChannel_Party then
+	        channel:Send("Automatic raid announcing and keyword based invitation by afRaidAnnouncer.")
+	    end
+	end	
 end
 
 
