@@ -1,7 +1,7 @@
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("AfRaidAnnouncer", "deDE")
 if not L then return end
 L["exWords"] = "Auf welche Begriffe soll das Addon reagieren? Mehrere Begriffe werden durch Kommata getrennt. Sobald ein Begriff im Zonenchat auftaucht, wird der Spieler eingeladen." 
-L["exWerbung"] = "Gib einen prägnanten Spruch ein, mit dem dein Raid im Chat beworben werden soll (\"[me]\" wird durch deinen aktuellen Charnamen ersetzt). Du musst den regionalen Channels begetreten sein (/chjoin zg, /chjoin zf), um dort posten zu können."
+L["exWerbung"] = "Gib einen prägnanten Spruch ein, mit dem dein Raid im Chat beworben werden soll (\"[me]\" wird durch deinen aktuellen Charnamen ersetzt). Du musst den regionalen Channels begetreten sein (/chjoin de, /chjoin fr), um dort posten zu können."
 L["lblActive"] = "Addon aktivieren"
 L["lblWerbungtime"] = "Spruch alle fünf Minuten im Map-Chat posten"
 L["lblWerbungreply"] = "Spruch posten, wenn ein Begriff im Chat gefunden (max. 5 Min.)"
@@ -28,3 +28,4 @@ L["lblAdd"] = "hinzufügen"
 L["lblUseBlacklist"] = "Blacklist nutzen"
 L["lblPromote"] = "nicht bewerben"
 L["ttPromote"] = "Das Addon wirbt einmal pro Raid für sich selbst im Gruppenchat."
+L["ttChannellist"] = "Kommagetrennte Liste weiter Chat-Channel-Namen, in denen gepostet werden soll"

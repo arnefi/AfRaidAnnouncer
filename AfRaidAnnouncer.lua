@@ -48,6 +48,8 @@ function AfRaidAnnouncer:new(o)
 	self.english = true
 	self.german = false
 	self.french = false
+	self.customchannels = false
+	self.channellist = {}
 	self.promote = true
 	self.promoteTimer = 0
 	self.leftGroup = true
@@ -72,7 +74,7 @@ function AfRaidAnnouncer:OnLoad()
     -- load our form file
 	self.xmlDoc = XmlDoc.CreateFromFile("AfRaidAnnouncer.xml")
 	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
-	Apollo.LoadSprites("AfRaidAnnouncerSprites.xml", "AfRaidAnnounserSprites")
+	Apollo.LoadSprites("AfRaidAnnouncerSprites.xml", "AfRaidAnnouncerSprites")
 end
 
 -----------------------------------------------------------------------------------------------
@@ -185,6 +187,15 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self.wndMain:FindChild("chk_english"):SetCheck(self.english)
 	self.wndMain:FindChild("chk_german"):SetCheck(self.german)
 	self.wndMain:FindChild("chk_french"):SetCheck(self.french)
+	self.wndMain:FindChild("chk_channels"):SetCheck(self.customchannels)
+	
+	local strChanneltemp = ""
+	for _,strChannelname in pairs(self.channellist) do
+		strChanneltemp = strChanneltemp .. strChannelname..", "
+	end
+	strChanneltemp = string.sub(strChanneltemp, 1, -3)
+	self.wndMain:FindChild("channellist"):SetText(strChanneltemp)
+	
 	
 	self.wndMain:FindChild("chkPromote"):SetCheck(not self.promote)
 	
@@ -223,6 +234,7 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 	self.wndMain:FindChild("werbungtime"):SetTooltip(L["onlyGroup"])
 	self.wndMain:FindChild("werbungreply"):SetTooltip(L["onlyGroup"])
 	self.wndMain:FindChild("chkPromote"):SetTooltip(L["ttPromote"])
+	self.wndMain:FindChild("channellist"):SetTooltip(L["ttChannellist"])
 end
 
 
@@ -372,6 +384,8 @@ function AfRaidAnnouncer:OnSave(eType)
 	tSavedData.english = self.english
 	tSavedData.german = self.german
 	tSavedData.french = self.french
+	tSavedData.customchannels = self.customchannels
+	tSavedData.channellist = self.channellist
 	tSavedData.promote = self.promote
 	tSavedData.location = self.location and self.location:ToTable() or nil
 	return tSavedData
@@ -399,6 +413,8 @@ function AfRaidAnnouncer:OnRestore(eType, tSavedData)
 	if tSavedData.english ~= nil then self.english = tSavedData.english end
 	if tSavedData.german ~= nil then self.german = tSavedData.german end
 	if tSavedData.french ~= nil then self.french = tSavedData.french end
+	if tSavedData.customchannels ~= nil then self.customchannels = tSavedData.customchannels end
+	if tSavedData.channellist ~= nil then self.channellist = tSavedData.channellist end
 	if tSavedData.promote ~= nil then self.promote = tSavedData.promote end
 	if tSavedData.location ~= nil then self.location = WindowLocation.new(tSavedData.location) end
 	self:RefreshScanwords()
@@ -539,6 +555,8 @@ end
 -----------------------------------------------------------------------------------------------
 
 function AfRaidAnnouncer:PostTeaser()
+	local idx
+	local strChannelname
     for _,channel in pairs(ChatSystemLib.GetChannels()) do
     	if channel:GetType() == ChatSystemLib.ChatChannel_Zone then
 			if self.english and self.werbungreplaced ~= "" then
@@ -565,6 +583,17 @@ function AfRaidAnnouncer:PostTeaser()
 				elseif self.werbungreplaced ~= "" then
 			        channel:Send(self.werbungreplaced)
 					self.counter = 300
+				end
+			end
+		end
+		strChannelname = string.lower(channel:GetName())
+		if channel:CanSend() then
+			for idx, cusChannel in pairs(self.channellist) do
+				if string.lower(cusChannel) == strChannelname then
+					if self.english and self.werbungreplaced ~= "" then
+				        channel:Send(self.werbungreplaced)
+						self.counter = 300
+					end
 				end
 			end
 		end
@@ -871,6 +900,15 @@ function AfRaidAnnouncer:OnOK()
 	self.english = self.wndMain:FindChild("chk_english"):IsChecked()
 	self.german = self.wndMain:FindChild("chk_german"):IsChecked()
 	self.french = self.wndMain:FindChild("chk_french"):IsChecked()
+	self.customchannels = self.wndMain:FindChild("chk_channels"):IsChecked()
+
+	-- divide string into table of keywords
+	local strChannels = self.wndMain:FindChild("channellist"):GetText()
+	self.channellist = {}
+	for wort in string.gmatch(strChannels, '([^,]+)') do
+		wort = wort:gsub("^%s*(.-)%s*$", "%1")
+		table.insert(self.channellist, wort)
+	end		
 	
 	self.promote = not self.wndMain:FindChild("chkPromote"):IsChecked()
 
