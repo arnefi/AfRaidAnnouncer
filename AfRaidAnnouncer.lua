@@ -171,7 +171,7 @@ function AfRaidAnnouncer:OnAfRaidAnnouncerOn()
 		self.wndMain:Close() 
 		return
 	end
-
+	
 	self.wndMain:Invoke() -- show the window
 	self.wndMain:FindChild("Blacklist"):Show(false)
 	
@@ -446,6 +446,28 @@ end
 
 
 -----------------------------------------------------------------------------------------------
+-- AfRaidAnnouncer CheckChannelWatch: check, if this private channel has to be watched
+-----------------------------------------------------------------------------------------------
+
+function AfRaidAnnouncer:CheckChannelWatch(channel)
+	if not self.customchannels then
+		return false
+	end
+	strChannelname = string.lower(channel:GetName())
+	local idx
+	local cusChannel
+	if channel:CanSend() then
+		for idx, cusChannel in pairs(self.channellist) do
+			if string.lower(cusChannel) == strChannelname then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+
+-----------------------------------------------------------------------------------------------
 -- AfRaidAnnouncer OnChatMessage: search chat for keywords
 -----------------------------------------------------------------------------------------------
 
@@ -473,7 +495,7 @@ function AfRaidAnnouncer:OnChatMessage(channelCurrent, tMessage)
 	local eChannelType = channelCurrent:GetType()
 	local sMessage = ""
 	
-	if eChannelType == ChatSystemLib.ChatChannel_Whisper or eChannelType == ChatSystemLib.ChatChannel_AccountWhisper or eChannelType == ChatSystemLib.ChatChannel_Say or eChannelType == ChatSystemLib.ChatChannel_Zone or eChannelType == ChatSystemLib.ChatChannel_ZoneGerman or eChannelType == ChatSystemLib.ChatChannel_ZoneFrench or eChannelType == ChatSystemLib.ChatChannel_Guild then
+	if self:CheckChannelWatch(channelCurrent) or eChannelType == ChatSystemLib.ChatChannel_Whisper or eChannelType == ChatSystemLib.ChatChannel_AccountWhisper or eChannelType == ChatSystemLib.ChatChannel_Say or eChannelType == ChatSystemLib.ChatChannel_Zone or eChannelType == ChatSystemLib.ChatChannel_ZoneGerman or eChannelType == ChatSystemLib.ChatChannel_ZoneFrench or eChannelType == ChatSystemLib.ChatChannel_Guild then
 		local bFound = false
 		for idx, tSegment in ipairs(tMessage.arMessageSegments) do
 			sMessage = string.lower(tSegment.strText)
@@ -586,15 +608,10 @@ function AfRaidAnnouncer:PostTeaser()
 				end
 			end
 		end
-		strChannelname = string.lower(channel:GetName())
-		if channel:CanSend() then
-			for idx, cusChannel in pairs(self.channellist) do
-				if string.lower(cusChannel) == strChannelname then
-					if self.english and self.werbungreplaced ~= "" then
-				        channel:Send(self.werbungreplaced)
-						self.counter = 300
-					end
-				end
+		if self:CheckChannelWatch(channel) then
+			if self.english and self.werbungreplaced ~= "" then
+		        channel:Send(self.werbungreplaced)
+				self.counter = 300
 			end
 		end
 	end
